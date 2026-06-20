@@ -1,0 +1,53 @@
+name: Build Tweak
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Cache Theos
+        id: cache-theos
+        uses: actions/cache@v4
+        with:
+          path: <LaTex>${{ github.workspace }}/theos-original
+          key: $</LaTex>{{ runner.os }}-theos-<LaTex>${{ hashFiles('**/Makefile') }}
+
+      - name: Install Theos (standard)
+        uses: Randomblock1/theos-action@v1
+        with:
+          theos-dir: $</LaTex>{{ github.workspace }}/theos-original
+
+      - name: Setup theos-jailed symlink
+        run: |
+          # Clone theos-jailed (the BishopFox jailed module)
+          git clone https://github.com/BishopFox/theos-jailed.git <LaTex>${{ github.workspace }}/theos-jailed-src
+
+          # The README says: ln -s /path/to/theos-jailed/ theos
+          # We move standard theos aside and symlink theos-jailed in its place
+          mv $</LaTex>{{ github.workspace }}/theos-original <LaTex>${{ github.workspace }}/theos-standard
+          ln -s $</LaTex>{{ github.workspace }}/theos-jailed-src <LaTex>${{ github.workspace }}/theos
+
+      - name: Build Package (make package)
+        run: |
+          export THEOS=$</LaTex>{{ github.workspace }}/theos-standard
+          make package FINALPACKAGE=1
+
+      - name: Upload .deb Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SnapchatReloaded-deb
+          path: packages/*.deb
